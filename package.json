@@ -52,7 +52,7 @@
     "three": "^0.152.2",
     "twitch-m3u8": "^1.1.5",
     "uuid": "^9.0.0",
-    "webtorrent": "^2.0.14"
+    "webtorrent": "^2.0.37"
   },
   "scripts": {
     "start": "node buildServer/server.js",
