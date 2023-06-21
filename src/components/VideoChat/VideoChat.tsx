@@ -26,6 +26,7 @@ interface VideoChatProps {
   owner: string | undefined;
   user: firebase.User | undefined;
   beta: boolean;
+
   // containerRef: React.RefObject<HTMLDivElement>;
   // useEffect: () => any;
   getLeaderTime: () => number;
@@ -34,22 +35,13 @@ interface VideoChatProps {
 export class VideoChat extends React.Component<VideoChatProps> {
   socket = this.props.socket;
   containerRef = React.createRef<HTMLDivElement>();
+  mindARInitialized = false;
   mindarThree: MindARThree;
 
   initializeMindAR = () => {
     //removing the video earlier
-    // const ourStream = window.watchparty.ourStream;
-    // const videoPCs = window.watchparty.videoPCs;
-    // ourStream &&
-    //   ourStream.getTracks().forEach((track) => {
-    //     track.stop();
-    //   });
-    // window.watchparty.ourStream = undefined;
-    // Object.keys(videoPCs).forEach((key) => {
-    //   videoPCs[key].close();
-    //   delete videoPCs[key];
-    // });
-    // this.socket.emit('CMD:starting MindAR');
+    this.stopWebRTC();
+    this.mindARInitialized = true;
     console.log('here-mindar');
     const mindarThree = new MindARThree({
       container: this.containerRef.current,
@@ -68,11 +60,8 @@ export class VideoChat extends React.Component<VideoChatProps> {
     // create a geometry
     const geometry2 = new THREE.BoxBufferGeometry(2, 2, 2);
 
-    // create a default (white) Basic material
-    const material2 = new THREE.MeshBasicMaterial();
-
     // create a Mesh containing the geometry and material
-    const cube = new THREE.Mesh(geometry2, material2);
+    const cube = new THREE.Mesh(geometry2, material);
 
     // add the mesh to the scene
     anchor.group.add(cube);
@@ -80,19 +69,25 @@ export class VideoChat extends React.Component<VideoChatProps> {
     anchor.group.add(plane);
 
     mindarThree.start();
+
+    let stream = renderer.domElement.captureStream(30);
+
+    window.watchparty.ourStream = stream;
+    console.log(
+      'in setup of mindAR-->',
+      renderer.domElement,
+      stream,
+      window.watchparty
+    );
+    // alert server we've joined video chat
+    this.socket.emit('CMD:joinVideo');
+    this.emitUserMute();
+
+    console.log(stream, 'stream');
+
     renderer.setAnimationLoop(() => {
       renderer.render(scene, camera);
     });
-
-    //adding canvas
-
-    // let stream = renderer.domElement;
-
-    // window.watchparty.ourStream = stream;
-    // // alert server we've joined video chat
-    // console.log(stream, 'here', window.watchparty);
-    // this.socket.emit('CMD:joinVideo');
-    // this.emitUserMute();
 
     return () => {
       renderer.setAnimationLoop(null);
@@ -162,50 +157,50 @@ export class VideoChat extends React.Component<VideoChatProps> {
     // Create default stream
     console.log('setupweb');
     let black = ({ width = 640, height = 480 } = {}) => {
-      let scene = new THREE.Scene();
-      //Add Renderer
-      let renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setClearColor('#263238');
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      // let scene = new THREE.Scene();
+      // //Add Renderer
+      // let renderer = new THREE.WebGLRenderer({ antialias: true });
+      // renderer.setClearColor('#263238');
+      // renderer.setSize(window.innerWidth, window.innerHeight);
 
-      //add Camera
-      let camera = new THREE.PerspectiveCamera(
-        75,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        1000
-      );
-      camera.position.z = 8;
-      camera.position.y = 5;
-      //Camera Controls
+      // //add Camera
+      // let camera = new THREE.PerspectiveCamera(
+      //   75,
+      //   window.innerWidth / window.innerHeight,
+      //   0.1,
+      //   1000
+      // );
+      // camera.position.z = 8;
+      // camera.position.y = 5;
+      // //Camera Controls
 
-      //LIGHTS
-      // create a geometry
-      const geometry2 = new THREE.BoxBufferGeometry(2, 2, 2);
+      // //LIGHTS
+      // // create a geometry
+      // const geometry2 = new THREE.BoxBufferGeometry(2, 2, 2);
 
-      // create a default (white) Basic material
-      const material2 = new THREE.MeshBasicMaterial();
+      // // create a default (white) Basic material
+      // const material2 = new THREE.MeshBasicMaterial();
 
-      // create a Mesh containing the geometry and material
-      const cube = new THREE.Mesh(geometry2, material2);
+      // // create a Mesh containing the geometry and material
+      // const cube = new THREE.Mesh(geometry2, material2);
 
-      scene.add(cube);
+      // scene.add(cube);
 
-      //ADD Your 3D Models here
-      this.renderScene();
-      //start animation
-      this.start();
+      // //ADD Your 3D Models here
+      // this.renderScene();
+      // //start animation
+      // this.start();
       let canvas: any = Object.assign(document.createElement('canvas'), {
         width,
         height,
       });
-      let test = new THREE.VideoTexture(canvas);
-      scene.background = test;
+      // let test = new THREE.VideoTexture(canvas);
+      // scene.background = test;
       //  canvas.appendChild(renderer.domElement);
       // canvas.style.position = 'absolute';
 
-      renderer.domElement.style.position = 'absolute';
-      console.log(renderer.domElement);
+      // renderer.domElement.style.position = 'absolute';
+      // console.log(renderer.domElement);
       canvas.getContext('2d')?.fillRect(0, 0, width, height);
       let stream = canvas.captureStream();
       return Object.assign(stream.getVideoTracks()[0], { enabled: false });
@@ -290,9 +285,11 @@ export class VideoChat extends React.Component<VideoChatProps> {
 
   updateWebRTC = () => {
     console.log('updateweb');
+
     const ourStream = window.watchparty.ourStream;
     const videoPCs = window.watchparty.videoPCs;
     const videoRefs = window.watchparty.videoRefs;
+    console.log('current__stream-->', ourStream, videoRefs);
     if (!ourStream) {
       // We haven't started video chat, exit
       return;
@@ -316,18 +313,22 @@ export class VideoChat extends React.Component<VideoChatProps> {
     this.props.participants.forEach((user) => {
       const id = user.clientId;
       if (!user.isVideoChat || videoPCs[id]) {
+        console.log('cheking streams--->', 1);
         // User isn't in video chat, or we already have a connection to them
         return;
       }
       if (id === selfId) {
+        console.log('cheking streams--->', 2);
         videoPCs[id] = new RTCPeerConnection();
         videoRefs[id].srcObject = ourStream;
       } else {
+        console.log('cheking streams--->', 6);
         const pc = new RTCPeerConnection({ iceServers: iceServers() });
         videoPCs[id] = pc;
         // Add our own video as outgoing stream
         ourStream?.getTracks().forEach((track) => {
           if (ourStream) {
+            console.log('cheking streams--->3', track);
             pc.addTrack(track, ourStream);
           }
         });
@@ -341,6 +342,7 @@ export class VideoChat extends React.Component<VideoChatProps> {
           // Mount the stream from peer
           // console.log(stream);
           videoRefs[id].srcObject = event.streams[0];
+          console.log('checking streams--->4', event, videoRefs[id].srcObject);
         };
         // For each pair, have the lexicographically smaller ID be the offerer
         const isOfferer = selfId < id;
@@ -372,6 +374,7 @@ export class VideoChat extends React.Component<VideoChatProps> {
       objectFit: 'contain' as any, // ObjectFit
     };
     const selfId = getAndSaveClientId();
+    console.log('participants==>', participants);
     return (
       <div
         style={{
@@ -475,7 +478,7 @@ export class VideoChat extends React.Component<VideoChatProps> {
             justifyContent: 'center',
             marginTop: '8px',
           }}
-          // ref={this.containerRef}
+          ref={this.containerRef}
         >
           {participants.map((p) => {
             return (
@@ -511,7 +514,22 @@ export class VideoChat extends React.Component<VideoChatProps> {
                         />
                       }
                     />
-                    {ourStream && p.isVideoChat ? (
+                    {ourStream && p.isVideoChat && this.mindARInitialized ? (
+                      <video
+                        ref={this.containerRef}
+                        style={{
+                          ...videoChatContentStyle,
+                          // mirror the video if it's our stream. this style mimics Zoom where your
+                          // video is mirrored only for you)
+                          transform: `scaleX(${
+                            p.clientId === selfId ? '-1' : '1'
+                          })`,
+                        }}
+                        autoPlay
+                        muted={p.clientId === selfId}
+                        data-id={p.id}
+                      />
+                    ) : ourStream && p.isVideoChat ? (
                       <video
                         ref={(el) => {
                           if (el) {
