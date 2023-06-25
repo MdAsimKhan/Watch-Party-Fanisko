@@ -2,8 +2,15 @@
 import React from 'react';
 import { Button, Icon } from 'semantic-ui-react';
 import { Socket } from 'socket.io-client';
-import { MindARThree } from 'mind-ar/dist/mindar-image-three.prod.js';
-import * as THREE from 'three';
+// not required, but will speed up things drastically (python required)
+// import '@tensorflow/tfjs-node';
+
+// implements nodejs wrappers for HTMLCanvasElement, HTMLImageElement, ImageData
+import * as createCanvas from 'canvas';
+// import { MindARThree } from 'mind-ar/dist/mindar-image-three.prod.js';
+import * as faceapi from 'face-api.js';
+import { TinyFaceDetectorOptions } from 'face-api.js';
+// import * as THREE from 'three';
 
 import {
   formatTimestamp,
@@ -34,85 +41,99 @@ interface VideoChatProps {
 
 export class VideoChat extends React.Component<VideoChatProps> {
   socket = this.props.socket;
-  containerRef = React.createRef<HTMLDivElement>();
-  mindARInitialized = false;
-  mindarThree: MindARThree;
+  cando = React.createRef<HTMLDivElement>();
 
-  initializeMindAR = () => {
+  ar;
+
+  initializeAR = async () => {
     //removing the video earlier
     this.stopWebRTC();
-    this.mindARInitialized = true;
-    console.log('here-mindar');
-    const mindarThree = new MindARThree({
-      container: this.containerRef.current,
-      imageTargetSrc:
-        'https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.0/examples/image-tracking/assets/card-example/card.mind',
+    this.ar = true;
+    console.log('herre---1');
+    let canvas: any = Object.assign(document.createElement('canvas'));
+    const streamConstraints = { audio: true, video: true };
+    // const mtcnnForwardParams = {
+    //   // limiting the search space to larger faces for webcam detection
+    //   minFaceSize: 200,
+    // };
+
+    //positions for sunglasess
+    var results = [];
+
+    // await faceapi.loadMtcnnModel('/weights');
+    // await faceapi.loadFaceRecognitionModel('/weights');
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.load('/weights'),
+      faceapi.nets.faceLandmark68Net.load('/weights'),
+      faceapi.nets.faceRecognitionNet.load('/weights'),
+    ]).then((res) => {
+      console.log(res);
     });
-    const { renderer, scene, camera } = mindarThree;
-    const anchor = mindarThree.addAnchor(0);
-    const geometry = new THREE.PlaneGeometry(1, 0.55);
-    const material = new THREE.MeshBasicMaterial({
-      color: 0x000,
-      transparent: true,
-      opacity: 0.5,
-    });
+    console.log('herre---2');
+    navigator?.mediaDevices
+      .getUserMedia({ audio: true, video: true })
+      .then((stream) => {
+        console.log('STREAM__HERE-->', stream);
 
-    // create a geometry
-    const geometry2 = new THREE.BoxBufferGeometry(2, 2, 2);
+        let localVideo = document.createElement('video');
+        localVideo.srcObject = stream;
+        localVideo.autoplay = true;
+        localVideo.addEventListener('playing', () => {
+          let ctx = this.cando.current.getContext('2d');
+          let image = new Image();
+          image.src = './public/img/sunglasses-style.png';
 
-    // create a Mesh containing the geometry and material
-    const cube = new THREE.Mesh(geometry2, material);
+          function step() {
+            // getFace(localVideo, TinyFaceDetectorOptions);
 
-    // add the mesh to the scene
-    anchor.group.add(cube);
-    const plane = new THREE.Mesh(geometry, material);
-    anchor.group.add(plane);
+            async function getFace(
+              localVideo: HTMLVideoElement,
+              options: TinyFaceDetectorOptions
+            ) {
+              const result = await faceapi
+                .detectSingleFace(localVideo, options)
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+              if (result) {
+                results = [result];
 
-    mindarThree.start();
+                ctx.drawImage(localVideo, 0, 0);
+                results.map((result) => {
+                  ctx.drawImage(
+                    image,
+                    result.faceDetection.box.x + 15,
+                    result.faceDetection.box.y + 30,
+                    result.faceDetection.box.width,
+                    result.faceDetection.box.width *
+                      (image.height / image.width)
+                  );
+                });
 
-    let stream = renderer.domElement.captureStream(30);
+                requestAnimationFrame(step);
+              } else {
+                results = [];
+              }
+            }
+          }
 
-    window.watchparty.ourStream = stream;
-    console.log(
-      'in setup of mindAR-->',
-      renderer.domElement,
-      stream,
-      window.watchparty
-    );
-    // alert server we've joined video chat
-    this.socket.emit('CMD:joinVideo');
-    this.emitUserMute();
+          requestAnimationFrame(step);
+        });
+        let localStream = this.cando.current.captureStream(30);
+        window.watchparty.ourStream = localStream;
+        console.log(
+          'in setup of mindAR-->',
 
-    console.log(stream, 'stream');
-
-    renderer.setAnimationLoop(() => {
-      renderer.render(scene, camera);
-    });
-
-    return () => {
-      renderer.setAnimationLoop(null);
-      mindarThree.stop();
-    };
+          localStream,
+          window.watchparty
+        );
+        // alert server we've joined video chat
+        this.socket.emit('CMD:joinVideo');
+        this.emitUserMute();
+      })
+      .catch((err) => {
+        console.log('ERROR---->', err);
+      });
   };
-
-  start = () => {
-    if (!this.frameId) {
-      this.frameId = requestAnimationFrame(this.animate);
-    }
-  };
-  stop = () => {
-    cancelAnimationFrame(this.frameId);
-  };
-  animate = () => {
-    //Animate Models Here
-    //ReDraw Scene with Camera and Scene Object
-    this.renderScene();
-    this.frameId = window.requestAnimationFrame(this.animate);
-  };
-  renderScene = () => {
-    if (this.renderer) this.renderer.render(this.scene, this.camera);
-  };
-
   componentDidMount() {
     console.log(window);
     this.socket.on('signal', this.handleSignal);
@@ -153,82 +174,102 @@ export class VideoChat extends React.Component<VideoChatProps> {
   };
 
   setupWebRTC = async () => {
+    this.ar = false;
     // Set up our own video
     // Create default stream
     console.log('setupweb');
     let black = ({ width = 640, height = 480 } = {}) => {
-      // let scene = new THREE.Scene();
-      // //Add Renderer
-      // let renderer = new THREE.WebGLRenderer({ antialias: true });
-      // renderer.setClearColor('#263238');
-      // renderer.setSize(window.innerWidth, window.innerHeight);
-
-      // //add Camera
-      // let camera = new THREE.PerspectiveCamera(
-      //   75,
-      //   window.innerWidth / window.innerHeight,
-      //   0.1,
-      //   1000
-      // );
-      // camera.position.z = 8;
-      // camera.position.y = 5;
-      // //Camera Controls
-
-      // //LIGHTS
-      // // create a geometry
-      // const geometry2 = new THREE.BoxBufferGeometry(2, 2, 2);
-
-      // // create a default (white) Basic material
-      // const material2 = new THREE.MeshBasicMaterial();
-
-      // // create a Mesh containing the geometry and material
-      // const cube = new THREE.Mesh(geometry2, material2);
-
-      // scene.add(cube);
-
-      // //ADD Your 3D Models here
-      // this.renderScene();
-      // //start animation
-      // this.start();
       let canvas: any = Object.assign(document.createElement('canvas'), {
         width,
         height,
       });
-      // let test = new THREE.VideoTexture(canvas);
-      // scene.background = test;
-      //  canvas.appendChild(renderer.domElement);
-      // canvas.style.position = 'absolute';
 
-      // renderer.domElement.style.position = 'absolute';
-      // console.log(renderer.domElement);
       canvas.getContext('2d')?.fillRect(0, 0, width, height);
+      // let ctx = canvas.getContext('2d')?.fillRect(0, 0, width, height);
+
       let stream = canvas.captureStream();
-      return Object.assign(stream.getVideoTracks()[0], { enabled: false });
+
+      // return Object.assign(stream.getVideoTracks()[0], { enabled: false });
+      const videoTrack = stream.getVideoTracks()[0];
+      videoTrack.enabled = false;
+
+      return videoTrack;
     };
     let stream = new MediaStream([black()]);
 
-    try {
-      stream = await navigator?.mediaDevices.getUserMedia({
-        audio: true,
-        video: true,
-      });
-    } catch (e) {
-      console.warn(e);
-      try {
-        console.log('attempt audio only stream');
-        stream = await navigator?.mediaDevices?.getUserMedia({
-          audio: true,
-          video: false,
-        });
-      } catch (e) {
-        console.warn(e);
+    const options = new faceapi.TinyFaceDetectorOptions();
+
+    const getFace = async (stream2, options) => {
+      const result = await faceapi
+        .detectSingleFace(stream2, options)
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (result) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(stream2, 0, 0);
+
+        const { image } = faceapi.createCanvasFromMedia(canvas);
+        const { faceDetection } = result;
+        ctx.drawImage(
+          image,
+          faceDetection.box.x + 15,
+          faceDetection.box.y + 30,
+          faceDetection.box.width,
+          faceDetection.box.width * (image.height / image.width)
+        );
+
+        requestAnimationFrame(step);
       }
-    }
-    window.watchparty.ourStream = stream;
-    console.log(stream, window.watchparty, 'in setup');
-    // alert server we've joined video chat
-    this.socket.emit('CMD:joinVideo');
-    this.emitUserMute();
+    };
+
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.load(
+        './public/weights/tiny_face_detector_model-weights_manifest.json'
+      ),
+      faceapi.nets.faceLandmark68Net.load(
+        './public/weights/face_landmark_68_model-weights_manifest.json'
+      ),
+      faceapi.nets.faceRecognitionNet.load(
+        './public/weights/face_recognition_model-weights_manifest.json'
+      ),
+      faceapi.nets.faceExpressionNet.load(
+        './public/weights/face_landmark_68_model-weights_manifest.json'
+      ),
+    ])
+      .then(async (res) => {
+        console.log('MOdel__RESULT', res);
+        try {
+          stream = await navigator?.mediaDevices
+            .getUserMedia({
+              audio: true,
+              video: true,
+            })
+            .then(async (stream) => {
+              await getFace(stream, options);
+            });
+        } catch (e) {
+          console.warn(e);
+          try {
+            console.log('attempt audio only stream');
+            stream = await navigator?.mediaDevices?.getUserMedia({
+              audio: true,
+              video: false,
+            });
+          } catch (e) {
+            console.warn(e);
+          }
+        }
+        window.watchparty.ourStream = stream;
+        console.log(stream, window.watchparty, 'in setup');
+        // alert server we've joined video chat
+        this.socket.emit('CMD:joinVideo');
+        this.emitUserMute();
+      })
+      .catch((err) => {
+        console.log('Model___ERROR', err);
+      });
   };
 
   stopWebRTC = () => {
@@ -284,7 +325,7 @@ export class VideoChat extends React.Component<VideoChatProps> {
   };
 
   updateWebRTC = () => {
-    console.log('updateweb');
+    console.log('updateweb--->', this.ar);
 
     const ourStream = window.watchparty.ourStream;
     const videoPCs = window.watchparty.videoPCs;
@@ -374,7 +415,7 @@ export class VideoChat extends React.Component<VideoChatProps> {
       objectFit: 'contain' as any, // ObjectFit
     };
     const selfId = getAndSaveClientId();
-    console.log('participants==>', participants);
+
     return (
       <div
         style={{
@@ -464,9 +505,9 @@ export class VideoChat extends React.Component<VideoChatProps> {
                 size="medium"
                 icon
                 labelPosition="left"
-                onClick={this.initializeMindAR}
+                onClick={this.initializeAR}
               >
-                MindAR
+                AR
               </Button>
             </div>
           </div>
@@ -481,6 +522,7 @@ export class VideoChat extends React.Component<VideoChatProps> {
           ref={this.containerRef}
         >
           {participants.map((p) => {
+            console.log('participants==>', p.isVideoChat);
             return (
               <div key={p.id}>
                 <div
@@ -514,9 +556,9 @@ export class VideoChat extends React.Component<VideoChatProps> {
                         />
                       }
                     />
-                    {ourStream && p.isVideoChat && this.mindARInitialized ? (
+                    {ourStream && p.isVideoChat && this.ar ? (
                       <video
-                        ref={this.containerRef}
+                        ref={this.cando}
                         style={{
                           ...videoChatContentStyle,
                           // mirror the video if it's our stream. this style mimics Zoom where your
