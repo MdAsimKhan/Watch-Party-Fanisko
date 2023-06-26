@@ -62,66 +62,65 @@ export class VideoChat extends React.Component<VideoChatProps> {
       console.log('herre---1', this.videoRef);
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       this.videoRef.current.srcObject = stream;
-      await Promise.all([
-        await faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
-        await faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
-        await faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
-        await faceapi.nets.faceExpressionNet.loadFromUri('/models'),
-      ]).then((res) => {
-        console.log(res);
-        this.startStreaming();
-      });
+
+      await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+      await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+      await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+      await faceapi.nets.faceExpressionNet.loadFromUri('/models');
+
+      this.startStreaming();
     } catch (error) {
       console.log(error);
     }
   };
 
   startStreaming = async () => {
+    console.log('herre---1 STart__STREAMING');
+
     const videoElement = this.videoRef.current;
     const canvasElement = this.canvasRef.current;
     const displaySize = {
-      width: videoElement.width,
-      height: videoElement.height,
+      width: 200,
+      height: 200,
     };
 
     faceapi.matchDimensions(canvasElement, displaySize);
-
+    console.log('herre---2 STart__STREAMING');
     const image = new Image();
-    image.src = 'path/to/your/image.png'; // Replace with the path to your image
+    image.src = './public/img/sunglasses-style.png'; // Replace with the path to your image
+    console.log('herre---3 STart__STREAMING', image);
+    // image.onload = () => {
+    console.log('MANNNN');
+    setInterval(async () => {
+      console.log('herre---4 STart__STREAMING');
+      const detections = await faceapi
+        .detectAllFaces(videoElement, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceExpressions();
 
-    image.onload = () => {
-      setInterval(async () => {
-        const detections = await faceapi
-          .detectAllFaces(videoElement, new faceapi.TinyFaceDetectorOptions())
-          .withFaceLandmarks()
-          .withFaceExpressions();
+      const resizedDetections = faceapi.resizeResults(detections, displaySize);
+      console.log('herre---5 STart__STREAMING');
+      canvasElement
+        .getContext('2d')
+        .clearRect(0, 0, canvasElement.width, canvasElement.height);
+      faceapi.draw.drawDetections(canvasElement, resizedDetections);
+      faceapi.draw.drawFaceLandmarks(canvasElement, resizedDetections);
+      faceapi.draw.drawFaceExpressions(canvasElement, resizedDetections);
 
-        const resizedDetections = faceapi.resizeResults(
-          detections,
-          displaySize
-        );
-
+      resizedDetections.forEach((result) => {
+        const { x, y, width } = result.detection.box;
         canvasElement
           .getContext('2d')
-          .clearRect(0, 0, canvasElement.width, canvasElement.height);
-        faceapi.draw.drawDetections(canvasElement, resizedDetections);
-        faceapi.draw.drawFaceLandmarks(canvasElement, resizedDetections);
-        faceapi.draw.drawFaceExpressions(canvasElement, resizedDetections);
-
-        resizedDetections.forEach((result) => {
-          const { x, y, width } = result.detection.box;
-          canvasElement
-            .getContext('2d')
-            .drawImage(
-              image,
-              x,
-              y + 30,
-              width,
-              width * (image.height / image.width)
-            );
-        });
-      }, 1000);
-    };
+          .drawImage(
+            image,
+            x,
+            y + 30,
+            width,
+            width * (image.height / image.width)
+          );
+      });
+    }, 1000);
+    // };
   };
 
   getFace = async (stream2, options) => {
@@ -580,6 +579,26 @@ export class VideoChat extends React.Component<VideoChatProps> {
             marginTop: '8px',
           }}
         >
+          {/* <div className="myapp">
+            {console.log('here-in-ar-part')}
+            <video
+              style={{
+                ...videoChatContentStyle,
+                // mirror the video if it's our stream. this style mimics Zoom where your
+                // video is mirrored only for you)
+              }}
+              crossOrigin="anonymous"
+              ref={this.videoRef}
+              autoPlay
+            ></video>
+
+            <canvas
+              ref={this.canvasRef}
+              width="940"
+              height="650"
+              className="appcanvas"
+            ></canvas>
+          </div> */}
           {participants.map((p) => {
             console.log('participants==>', p.isVideoChat);
             return (
@@ -615,7 +634,7 @@ export class VideoChat extends React.Component<VideoChatProps> {
                         />
                       }
                     />
-                    {ourStream && p.isVideoChat && this.ar ? (
+                    {this.ar ? (
                       <div className="myapp">
                         {console.log('here-in-ar-part')}
                         <video

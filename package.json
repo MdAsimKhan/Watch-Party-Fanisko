@@ -59,7 +59,7 @@
   },
   "scripts": {
     "start": "node buildServer/server.js",
-    "react": "react-scripts start",
+    "react": "GENERATE_SOURCEMAP=false react-scripts start",
     "build": "npm run buildReact && npm run buildServer",
     "buildReact": "react-scripts build",
     "buildServer": "tsc --project server/tsconfig.json",
