@@ -40,100 +40,211 @@ interface VideoChatProps {
 }
 
 export class VideoChat extends React.Component<VideoChatProps> {
+  constructor(props) {
+    super(props);
+    this.startStreaming = this.startStreaming.bind(this);
+    this.videoRef = React.createRef<HTMLVideoElement>();
+    this.canvasRef = React.createRef<HTMLCanvasElement>();
+  }
   socket = this.props.socket;
   cando = React.createRef<HTMLDivElement>();
+  videoRef = React.createRef<HTMLVideoElement>();
+  canvasRef = React.createRef<HTMLCanvasElement>();
 
   ar;
+  options = new faceapi.TinyFaceDetectorOptions();
 
-  initializeAR = async () => {
-    //removing the video earlier
-    this.stopWebRTC();
-    this.ar = true;
-    console.log('herre---1');
-    let canvas: any = Object.assign(document.createElement('canvas'));
-    const streamConstraints = { audio: true, video: true };
-    // const mtcnnForwardParams = {
-    //   // limiting the search space to larger faces for webcam detection
-    //   minFaceSize: 200,
-    // };
-
-    //positions for sunglasess
-    var results = [];
-
-    // await faceapi.loadMtcnnModel('/weights');
-    // await faceapi.loadFaceRecognitionModel('/weights');
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.load('/weights'),
-      faceapi.nets.faceLandmark68Net.load('/weights'),
-      faceapi.nets.faceRecognitionNet.load('/weights'),
-    ]).then((res) => {
-      console.log(res);
-    });
-    console.log('herre---2');
-    navigator?.mediaDevices
-      .getUserMedia({ audio: true, video: true })
-      .then((stream) => {
-        console.log('STREAM__HERE-->', stream);
-
-        let localVideo = document.createElement('video');
-        localVideo.srcObject = stream;
-        localVideo.autoplay = true;
-        localVideo.addEventListener('playing', () => {
-          let ctx = this.cando.current.getContext('2d');
-          let image = new Image();
-          image.src = './public/img/sunglasses-style.png';
-
-          function step() {
-            // getFace(localVideo, TinyFaceDetectorOptions);
-
-            async function getFace(
-              localVideo: HTMLVideoElement,
-              options: TinyFaceDetectorOptions
-            ) {
-              const result = await faceapi
-                .detectSingleFace(localVideo, options)
-                .withFaceLandmarks()
-                .withFaceDescriptor();
-              if (result) {
-                results = [result];
-
-                ctx.drawImage(localVideo, 0, 0);
-                results.map((result) => {
-                  ctx.drawImage(
-                    image,
-                    result.faceDetection.box.x + 15,
-                    result.faceDetection.box.y + 30,
-                    result.faceDetection.box.width,
-                    result.faceDetection.box.width *
-                      (image.height / image.width)
-                  );
-                });
-
-                requestAnimationFrame(step);
-              } else {
-                results = [];
-              }
-            }
-          }
-
-          requestAnimationFrame(step);
-        });
-        let localStream = this.cando.current.captureStream(30);
-        window.watchparty.ourStream = localStream;
-        console.log(
-          'in setup of mindAR-->',
-
-          localStream,
-          window.watchparty
-        );
-        // alert server we've joined video chat
-        this.socket.emit('CMD:joinVideo');
-        this.emitUserMute();
-      })
-      .catch((err) => {
-        console.log('ERROR---->', err);
+  tryAR = async () => {
+    try {
+      //removing the video earlier
+      this.stopWebRTC();
+      this.ar = true;
+      console.log('herre---1', this.videoRef);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      this.videoRef.current.srcObject = stream;
+      await Promise.all([
+        await faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+        await faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
+        await faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
+        await faceapi.nets.faceExpressionNet.loadFromUri('/models'),
+      ]).then((res) => {
+        console.log(res);
+        this.startStreaming();
       });
+    } catch (error) {
+      console.log(error);
+    }
   };
+
+  startStreaming = async () => {
+    const videoElement = this.videoRef.current;
+    const canvasElement = this.canvasRef.current;
+    const displaySize = {
+      width: videoElement.width,
+      height: videoElement.height,
+    };
+
+    faceapi.matchDimensions(canvasElement, displaySize);
+
+    const image = new Image();
+    image.src = 'path/to/your/image.png'; // Replace with the path to your image
+
+    image.onload = () => {
+      setInterval(async () => {
+        const detections = await faceapi
+          .detectAllFaces(videoElement, new faceapi.TinyFaceDetectorOptions())
+          .withFaceLandmarks()
+          .withFaceExpressions();
+
+        const resizedDetections = faceapi.resizeResults(
+          detections,
+          displaySize
+        );
+
+        canvasElement
+          .getContext('2d')
+          .clearRect(0, 0, canvasElement.width, canvasElement.height);
+        faceapi.draw.drawDetections(canvasElement, resizedDetections);
+        faceapi.draw.drawFaceLandmarks(canvasElement, resizedDetections);
+        faceapi.draw.drawFaceExpressions(canvasElement, resizedDetections);
+
+        resizedDetections.forEach((result) => {
+          const { x, y, width } = result.detection.box;
+          canvasElement
+            .getContext('2d')
+            .drawImage(
+              image,
+              x,
+              y + 30,
+              width,
+              width * (image.height / image.width)
+            );
+        });
+      }, 1000);
+    };
+  };
+
+  getFace = async (stream2, options) => {
+    const result = await faceapi
+      .detectSingleFace(stream2, options)
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+
+    if (result) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(stream2, 0, 0);
+
+      const { image } = faceapi.createCanvasFromMedia(canvas);
+      const { faceDetection } = result;
+      ctx.drawImage(
+        image,
+        faceDetection.box.x + 15,
+        faceDetection.box.y + 30,
+        faceDetection.box.width,
+        faceDetection.box.width * (image.height / image.width)
+      );
+
+      requestAnimationFrame(step);
+    }
+  };
+
+  // initializeAR = async () => {
+  //   //removing the video earlier
+  //   this.stopWebRTC();
+  //   this.ar = true;
+  //   console.log('herre---1');
+  //   let canvas: any = Object.assign(document.createElement('canvas'));
+  //   const streamConstraints = { audio: true, video: true };
+  //   // const mtcnnForwardParams = {
+  //   //   // limiting the search space to larger faces for webcam detection
+  //   //   minFaceSize: 200,
+  //   // };
+
+  //   //positions for sunglasess
+  //   var results = [];
+
+  //   await Promise.all([
+  //     faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+  //     faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
+  //     faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
+  //     faceapi.nets.faceExpressionNet.loadFromUri('/models'),
+  //   ]);
+
+  //   // await faceapi.loadMtcnnModel('/weights');
+  //   // await faceapi.loadFaceRecognitionModel('/weights');
+  //   await Promise.all([
+  //     faceapi.nets.tinyFaceDetector.load('/weights'),
+  //     faceapi.nets.faceLandmark68Net.load('/weights'),
+  //     faceapi.nets.faceRecognitionNet.load('/weights'),
+  //   ]).then((res) => {
+  //     console.log(res);
+  //   });
+  //   console.log('herre---2');
+  //   navigator?.mediaDevices
+  //     .getUserMedia({ audio: true, video: true })
+  //     .then((stream) => {
+  //       console.log('STREAM__HERE-->', stream);
+
+  //       let localVideo = document.createElement('video');
+  //       localVideo.srcObject = stream;
+  //       localVideo.autoplay = true;
+  //       localVideo.addEventListener('playing', () => {
+  //         let ctx = this.cando.current.getContext('2d');
+  //         let image = new Image();
+  //         image.src = './public/img/sunglasses-style.png';
+
+  //         function step() {
+  //           // getFace(localVideo, TinyFaceDetectorOptions);
+
+  //           async function getFace(
+  //             localVideo: HTMLVideoElement,
+  //             options: TinyFaceDetectorOptions
+  //           ) {
+  //             const result = await faceapi
+  //               .detectSingleFace(localVideo, options)
+  //               .withFaceLandmarks()
+  //               .withFaceDescriptor();
+  //             if (result) {
+  //               results = [result];
+
+  //               ctx.drawImage(localVideo, 0, 0);
+  //               results.map((result) => {
+  //                 ctx.drawImage(
+  //                   image,
+  //                   result.faceDetection.box.x + 15,
+  //                   result.faceDetection.box.y + 30,
+  //                   result.faceDetection.box.width,
+  //                   result.faceDetection.box.width *
+  //                     (image.height / image.width)
+  //                 );
+  //               });
+
+  //               requestAnimationFrame(step);
+  //             } else {
+  //               results = [];
+  //             }
+  //           }
+  //         }
+
+  //         requestAnimationFrame(step);
+  //       });
+  //       let localStream = this.cando.current.captureStream(30);
+  //       window.watchparty.ourStream = localStream;
+  //       console.log(
+  //         'in setup of mindAR-->',
+
+  //         localStream,
+  //         window.watchparty
+  //       );
+  //       // alert server we've joined video chat
+  //       this.socket.emit('CMD:joinVideo');
+  //       this.emitUserMute();
+  //     })
+  //     .catch((err) => {
+  //       console.log('ERROR---->', err);
+  //     });
+  // };
   componentDidMount() {
     console.log(window);
     this.socket.on('signal', this.handleSignal);
@@ -197,79 +308,28 @@ export class VideoChat extends React.Component<VideoChatProps> {
     };
     let stream = new MediaStream([black()]);
 
-    const options = new faceapi.TinyFaceDetectorOptions();
-
-    const getFace = async (stream2, options) => {
-      const result = await faceapi
-        .detectSingleFace(stream2, options)
-        .withFaceLandmarks()
-        .withFaceDescriptor();
-
-      if (result) {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(stream2, 0, 0);
-
-        const { image } = faceapi.createCanvasFromMedia(canvas);
-        const { faceDetection } = result;
-        ctx.drawImage(
-          image,
-          faceDetection.box.x + 15,
-          faceDetection.box.y + 30,
-          faceDetection.box.width,
-          faceDetection.box.width * (image.height / image.width)
-        );
-
-        requestAnimationFrame(step);
-      }
-    };
-
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.load(
-        './public/weights/tiny_face_detector_model-weights_manifest.json'
-      ),
-      faceapi.nets.faceLandmark68Net.load(
-        './public/weights/face_landmark_68_model-weights_manifest.json'
-      ),
-      faceapi.nets.faceRecognitionNet.load(
-        './public/weights/face_recognition_model-weights_manifest.json'
-      ),
-      faceapi.nets.faceExpressionNet.load(
-        './public/weights/face_landmark_68_model-weights_manifest.json'
-      ),
-    ])
-      .then(async (res) => {
-        console.log('MOdel__RESULT', res);
-        try {
-          stream = await navigator?.mediaDevices
-            .getUserMedia({
-              audio: true,
-              video: true,
-            })
-            .then(async (stream) => {
-              await getFace(stream, options);
-            });
-        } catch (e) {
-          console.warn(e);
-          try {
-            console.log('attempt audio only stream');
-            stream = await navigator?.mediaDevices?.getUserMedia({
-              audio: true,
-              video: false,
-            });
-          } catch (e) {
-            console.warn(e);
-          }
-        }
-        window.watchparty.ourStream = stream;
-        console.log(stream, window.watchparty, 'in setup');
-        // alert server we've joined video chat
-        this.socket.emit('CMD:joinVideo');
-        this.emitUserMute();
-      })
-      .catch((err) => {
-        console.log('Model___ERROR', err);
+    try {
+      stream = await navigator?.mediaDevices.getUserMedia({
+        audio: true,
+        video: true,
       });
+    } catch (e) {
+      console.warn(e);
+      try {
+        console.log('attempt audio only stream');
+        stream = await navigator?.mediaDevices?.getUserMedia({
+          audio: true,
+          video: false,
+        });
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+    window.watchparty.ourStream = stream;
+    console.log(stream, window.watchparty, 'in setup');
+    // alert server we've joined video chat
+    this.socket.emit('CMD:joinVideo');
+    this.emitUserMute();
   };
 
   stopWebRTC = () => {
@@ -505,7 +565,7 @@ export class VideoChat extends React.Component<VideoChatProps> {
                 size="medium"
                 icon
                 labelPosition="left"
-                onClick={this.initializeAR}
+                onClick={this.tryAR}
               >
                 AR
               </Button>
@@ -519,7 +579,6 @@ export class VideoChat extends React.Component<VideoChatProps> {
             justifyContent: 'center',
             marginTop: '8px',
           }}
-          ref={this.containerRef}
         >
           {participants.map((p) => {
             console.log('participants==>', p.isVideoChat);
@@ -557,25 +616,35 @@ export class VideoChat extends React.Component<VideoChatProps> {
                       }
                     />
                     {ourStream && p.isVideoChat && this.ar ? (
-                      <video
-                        ref={this.cando}
-                        style={{
-                          ...videoChatContentStyle,
-                          // mirror the video if it's our stream. this style mimics Zoom where your
-                          // video is mirrored only for you)
-                          transform: `scaleX(${
-                            p.clientId === selfId ? '-1' : '1'
-                          })`,
-                        }}
-                        autoPlay
-                        muted={p.clientId === selfId}
-                        data-id={p.id}
-                      />
+                      <div className="myapp">
+                        {console.log('here-in-ar-part')}
+                        <video
+                          style={{
+                            ...videoChatContentStyle,
+                            // mirror the video if it's our stream. this style mimics Zoom where your
+                            // video is mirrored only for you)
+                            transform: `scaleX(${
+                              p.clientId === selfId ? '-1' : '1'
+                            })`,
+                          }}
+                          crossOrigin="anonymous"
+                          ref={this.videoRef}
+                          autoPlay
+                        ></video>
+
+                        <canvas
+                          ref={this.canvasRef}
+                          width="940"
+                          height="650"
+                          className="appcanvas"
+                        ></canvas>
+                      </div>
                     ) : ourStream && p.isVideoChat ? (
                       <video
                         ref={(el) => {
                           if (el) {
                             videoRefs[p.clientId] = el;
+                            // this.getFace(videoRefs[p.clientId], this.options);
                           }
                         }}
                         style={{
