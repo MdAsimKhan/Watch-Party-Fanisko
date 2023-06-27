@@ -672,20 +672,21 @@ export class VideoChat extends React.Component<VideoChatProps> {
                             ...videoChatContentStyle,
                             // mirror the video if it's our stream. this style mimics Zoom where your
                             // video is mirrored only for you)
-                            transform: `scaleX(${
-                              p.clientId === selfId ? '-1' : '1'
-                            })`,
                           }}
                           crossOrigin="anonymous"
                           ref={this.videoRef}
                           autoPlay
                         ></video>
-
                         <canvas
                           ref={this.canvasRef}
                           width="940"
                           height="650"
                           className="appcanvas"
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                          }}
                         ></canvas>
                       </div>
                     ) : ourStream && p.isVideoChat ? (
