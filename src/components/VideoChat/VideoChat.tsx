@@ -141,6 +141,17 @@ export class VideoChat extends React.Component<VideoChatProps> {
               );
           });
         }, 1000);
+        let localStream = canvasElement.captureStream(30);
+        window.watchparty.ourStream = localStream;
+        console.log(
+          'in setup of mindAR-->',
+
+          localStream,
+          window.watchparty
+        );
+        //       // alert server we've joined video chat
+        this.socket.emit('CMD:joinVideo');
+        this.emitUserMute();
       })
       .catch((error) => {
         console.log(error);
