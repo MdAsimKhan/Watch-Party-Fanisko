@@ -86,40 +86,70 @@ export class VideoChat extends React.Component<VideoChatProps> {
 
     faceapi.matchDimensions(canvasElement, displaySize);
     console.log('herre---2 STart__STREAMING');
-    const image = new Image();
-    image.src = './public/img/sunglasses-style.png'; // Replace with the path to your image
-    console.log('herre---3 STart__STREAMING', image);
-    // image.onload = () => {
+
     console.log('MANNNN');
-    setInterval(async () => {
-      console.log('herre---4 STart__STREAMING');
-      const detections = await faceapi
-        .detectAllFaces(videoElement, new faceapi.TinyFaceDetectorOptions())
-        .withFaceLandmarks()
-        .withFaceExpressions();
 
-      const resizedDetections = faceapi.resizeResults(detections, displaySize);
-      console.log('herre---5 STart__STREAMING');
-      canvasElement
-        .getContext('2d')
-        .clearRect(0, 0, canvasElement.width, canvasElement.height);
-      faceapi.draw.drawDetections(canvasElement, resizedDetections);
-      faceapi.draw.drawFaceLandmarks(canvasElement, resizedDetections);
-      faceapi.draw.drawFaceExpressions(canvasElement, resizedDetections);
-
-      resizedDetections.forEach((result) => {
-        const { x, y, width } = result.detection.box;
-        canvasElement
-          .getContext('2d')
-          .drawImage(
-            image,
-            x,
-            y + 30,
-            width,
-            width * (image.height / image.width)
-          );
+    //function to load image
+    function loadImage(url) {
+      return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = function () {
+          resolve(image);
+          console.log('herre---3 STart__STREAMING', image);
+        };
+        image.onerror = function () {
+          reject(new Error('Failed to load image: ' + url));
+        };
+        image.src = url;
       });
-    }, 1000);
+    }
+
+    //calling the image load fn
+    loadImage('/sunglasses.png')
+      .then((image) => {
+        // Image has finished loading
+        // Now you can safely draw it on the canvas
+        setInterval(async () => {
+          console.log('herre---4 STart__STREAMING');
+          const detections = await faceapi
+            .detectAllFaces(videoElement, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks()
+            .withFaceExpressions();
+
+          const resizedDetections = faceapi.resizeResults(
+            detections,
+            displaySize
+          );
+          console.log('herre---5 STart__STREAMING');
+          canvasElement
+            .getContext('2d')
+            .clearRect(0, 0, canvasElement.width, canvasElement.height);
+          faceapi.draw.drawDetections(canvasElement, resizedDetections);
+          faceapi.draw.drawFaceLandmarks(canvasElement, resizedDetections);
+          faceapi.draw.drawFaceExpressions(canvasElement, resizedDetections);
+
+          resizedDetections.forEach((result) => {
+            const { x, y, width } = result.detection.box;
+            canvasElement
+              .getContext('2d')
+              .drawImage(
+                image,
+                x,
+                y + 30,
+                width,
+                width * (image.height / image.width)
+              );
+          });
+        }, 1000);
+      })
+      .catch((error) => {
+        console.log(error);
+      });
+
+    // image.src = './public/img/sunglasses-style.png'; // Replace with the path to your image
+
+    // image.onload = () => {
+
     // };
   };
 
