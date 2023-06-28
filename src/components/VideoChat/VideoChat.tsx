@@ -140,18 +140,52 @@ export class VideoChat extends React.Component<VideoChatProps> {
                 width * (image.height / image.width)
               );
           });
-        }, 1000);
-        let localStream = canvasElement.captureStream(30);
-        window.watchparty.ourStream = localStream;
-        console.log(
-          'in setup of mindAR-->',
 
-          localStream,
-          window.watchparty
-        );
-        //       // alert server we've joined video chat
-        this.socket.emit('CMD:joinVideo');
+          // const canvasStream = canvasElement.captureStream(30);
+          // const videoStream = videoElement.srcObject;
+
+          // // Create a new MediaStream object and add the canvas and video tracks to it
+          // const combinedStream = new MediaStream();
+          // canvasStream.getTracks().forEach((track) => {
+          //   combinedStream.addTrack(track);
+          // });
+          // videoStream.getTracks().forEach((track) => {
+          //   combinedStream.addTrack(track);
+          // });
+
+          // window.watchparty.ourStream = combinedStream;
+          // console.log('COMBINED__STREAM', combinedStream);
+
+          const canvasStream = canvasElement.captureStream(30);
+          const videoStream = videoElement.srcObject;
+
+          // Create a new MediaStream object and add the canvas and cloned video tracks to it
+          const combinedStream = new MediaStream();
+          canvasStream.getTracks().forEach((track) => {
+            combinedStream.addTrack(track);
+          });
+          videoStream.getTracks().forEach((track) => {
+            const clonedTrack = track.clone();
+            combinedStream.addTrack(clonedTrack);
+          });
+
+          window.watchparty.ourStream = combinedStream;
+          console.log('COMBINED__STREAM', combinedStream);
+          this.socket.emit('CMD:joinVideo');
+
+          console.log(
+            'in setup of mindAR2-->',
+
+            window.watchparty,
+            combinedStream
+          );
+
+          // Send the combined stream to the other peer using the appropriate method or library for your WebRTC implementation
+          // e.g., this.socket.emit('CMD:sendCombinedStream', combinedStream);
+        }, 1000);
+
         this.emitUserMute();
+        //       // alert server we've joined video chat
       })
       .catch((error) => {
         console.log(error);
@@ -481,7 +515,7 @@ export class VideoChat extends React.Component<VideoChatProps> {
         };
         pc.ontrack = (event: RTCTrackEvent) => {
           // Mount the stream from peer
-          // console.log(stream);
+          console.log(event);
           videoRefs[id].srcObject = event.streams[0];
           console.log('checking streams--->4', event, videoRefs[id].srcObject);
         };
