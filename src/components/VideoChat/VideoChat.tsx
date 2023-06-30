@@ -89,13 +89,12 @@ export class VideoChat extends React.Component<VideoChatProps> {
 
     console.log('MANNNN');
 
-    //function to load image
+    // Function to load image
     function loadImage(url) {
       return new Promise((resolve, reject) => {
         const image = new Image();
         image.onload = function () {
           resolve(image);
-          console.log('herre---3 STart__STREAMING', image);
         };
         image.onerror = function () {
           reject(new Error('Failed to load image: ' + url));
@@ -104,13 +103,12 @@ export class VideoChat extends React.Component<VideoChatProps> {
       });
     }
 
-    //calling the image load fn
+    // Calling the image load function
     loadImage('/sunglasses.png')
       .then((image) => {
         // Image has finished loading
         // Now you can safely draw it on the canvas
-        setInterval(async () => {
-          console.log('herre---4 STart__STREAMING');
+        async function render() {
           const detections = await faceapi
             .detectAllFaces(videoElement, new faceapi.TinyFaceDetectorOptions())
             .withFaceLandmarks()
@@ -120,7 +118,7 @@ export class VideoChat extends React.Component<VideoChatProps> {
             detections,
             displaySize
           );
-          console.log('herre---5 STart__STREAMING');
+
           canvasElement
             .getContext('2d')
             .clearRect(0, 0, canvasElement.width, canvasElement.height);
@@ -141,61 +139,54 @@ export class VideoChat extends React.Component<VideoChatProps> {
               );
           });
 
-          // const canvasStream = canvasElement.captureStream(30);
-          // const videoStream = videoElement.srcObject;
+          // Perform any other updates or actions here
 
-          // // Create a new MediaStream object and add the canvas and video tracks to it
-          // const combinedStream = new MediaStream();
-          // canvasStream.getTracks().forEach((track) => {
-          //   combinedStream.addTrack(track);
-          // });
-          // videoStream.getTracks().forEach((track) => {
-          //   combinedStream.addTrack(track);
-          // });
+          requestAnimationFrame(render);
+        }
 
-          // window.watchparty.ourStream = combinedStream;
-          // console.log('COMBINED__STREAM', combinedStream);
+        requestAnimationFrame(render);
 
-          const canvasStream = canvasElement.captureStream(30);
-          const videoStream = videoElement.srcObject;
+        // Get the canvas stream
+        const canvasStream = canvasElement.captureStream(30);
 
-          // Create a new MediaStream object and add the canvas and cloned video tracks to it
-          const combinedStream = new MediaStream();
-          canvasStream.getTracks().forEach((track) => {
-            combinedStream.addTrack(track);
-          });
-          videoStream.getTracks().forEach((track) => {
-            const clonedTrack = track.clone();
-            combinedStream.addTrack(clonedTrack);
-          });
+        // Get the video stream
+        const videoStream = videoElement.srcObject;
 
-          window.watchparty.ourStream = combinedStream;
-          console.log('COMBINED__STREAM', combinedStream);
-          this.socket.emit('CMD:joinVideo');
+        // Create a new MediaStream object
+        const combinedStream = new MediaStream();
 
-          console.log(
-            'in setup of mindAR2-->',
+        // Get the tracks from the canvas stream
+        const canvasTracks = canvasStream.getTracks();
 
-            window.watchparty,
-            combinedStream
-          );
+        // Add canvas tracks to the combined stream
+        canvasTracks.forEach((track) => {
+          combinedStream.addTrack(track);
+        });
 
-          // Send the combined stream to the other peer using the appropriate method or library for your WebRTC implementation
-          // e.g., this.socket.emit('CMD:sendCombinedStream', combinedStream);
-        }, 1000);
+        // Get the tracks from the video stream
+        const videoTracks = videoStream.getTracks();
 
-        this.emitUserMute();
-        //       // alert server we've joined video chat
+        // Add video tracks to the combined stream
+        videoTracks.forEach((track) => {
+          combinedStream.addTrack(track);
+        });
+
+        window.watchparty.ourStream = combinedStream;
+        console.log(
+          'COMBINED__STREAM',
+          window.watchparty,
+          combinedStream,
+          videoStream,
+          canvasStream,
+          window.watchparty.videoRefs
+        );
+        this.socket.emit('CMD:joinVideo');
+
+        // Other code...
       })
       .catch((error) => {
         console.log(error);
       });
-
-    // image.src = './public/img/sunglasses-style.png'; // Replace with the path to your image
-
-    // image.onload = () => {
-
-    // };
   };
 
   getFace = async (stream2, options) => {
@@ -223,102 +214,6 @@ export class VideoChat extends React.Component<VideoChatProps> {
     }
   };
 
-  // initializeAR = async () => {
-  //   //removing the video earlier
-  //   this.stopWebRTC();
-  //   this.ar = true;
-  //   console.log('herre---1');
-  //   let canvas: any = Object.assign(document.createElement('canvas'));
-  //   const streamConstraints = { audio: true, video: true };
-  //   // const mtcnnForwardParams = {
-  //   //   // limiting the search space to larger faces for webcam detection
-  //   //   minFaceSize: 200,
-  //   // };
-
-  //   //positions for sunglasess
-  //   var results = [];
-
-  //   await Promise.all([
-  //     faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
-  //     faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
-  //     faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
-  //     faceapi.nets.faceExpressionNet.loadFromUri('/models'),
-  //   ]);
-
-  //   // await faceapi.loadMtcnnModel('/weights');
-  //   // await faceapi.loadFaceRecognitionModel('/weights');
-  //   await Promise.all([
-  //     faceapi.nets.tinyFaceDetector.load('/weights'),
-  //     faceapi.nets.faceLandmark68Net.load('/weights'),
-  //     faceapi.nets.faceRecognitionNet.load('/weights'),
-  //   ]).then((res) => {
-  //     console.log(res);
-  //   });
-  //   console.log('herre---2');
-  //   navigator?.mediaDevices
-  //     .getUserMedia({ audio: true, video: true })
-  //     .then((stream) => {
-  //       console.log('STREAM__HERE-->', stream);
-
-  //       let localVideo = document.createElement('video');
-  //       localVideo.srcObject = stream;
-  //       localVideo.autoplay = true;
-  //       localVideo.addEventListener('playing', () => {
-  //         let ctx = this.cando.current.getContext('2d');
-  //         let image = new Image();
-  //         image.src = './public/img/sunglasses-style.png';
-
-  //         function step() {
-  //           // getFace(localVideo, TinyFaceDetectorOptions);
-
-  //           async function getFace(
-  //             localVideo: HTMLVideoElement,
-  //             options: TinyFaceDetectorOptions
-  //           ) {
-  //             const result = await faceapi
-  //               .detectSingleFace(localVideo, options)
-  //               .withFaceLandmarks()
-  //               .withFaceDescriptor();
-  //             if (result) {
-  //               results = [result];
-
-  //               ctx.drawImage(localVideo, 0, 0);
-  //               results.map((result) => {
-  //                 ctx.drawImage(
-  //                   image,
-  //                   result.faceDetection.box.x + 15,
-  //                   result.faceDetection.box.y + 30,
-  //                   result.faceDetection.box.width,
-  //                   result.faceDetection.box.width *
-  //                     (image.height / image.width)
-  //                 );
-  //               });
-
-  //               requestAnimationFrame(step);
-  //             } else {
-  //               results = [];
-  //             }
-  //           }
-  //         }
-
-  //         requestAnimationFrame(step);
-  //       });
-  //       let localStream = this.cando.current.captureStream(30);
-  //       window.watchparty.ourStream = localStream;
-  //       console.log(
-  //         'in setup of mindAR-->',
-
-  //         localStream,
-  //         window.watchparty
-  //       );
-  //       // alert server we've joined video chat
-  //       this.socket.emit('CMD:joinVideo');
-  //       this.emitUserMute();
-  //     })
-  //     .catch((err) => {
-  //       console.log('ERROR---->', err);
-  //     });
-  // };
   componentDidMount() {
     console.log(window);
     this.socket.on('signal', this.handleSignal);
