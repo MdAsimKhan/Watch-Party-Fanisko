@@ -160,6 +160,7 @@ export class VideoChat extends React.Component<VideoChatProps> {
 
         // Add canvas tracks to the combined stream
         canvasTracks.forEach((track) => {
+          console.log('----AR-CanavsTRack----', track);
           combinedStream.addTrack(track);
         });
 
@@ -168,6 +169,7 @@ export class VideoChat extends React.Component<VideoChatProps> {
 
         // Add video tracks to the combined stream
         videoTracks.forEach((track) => {
+          console.log('----AR-VideoTRack----', track);
           combinedStream.addTrack(track);
         });
 
@@ -175,7 +177,7 @@ export class VideoChat extends React.Component<VideoChatProps> {
         console.log(
           'COMBINED__STREAM',
           window.watchparty,
-          combinedStream,
+          combinedStream.getTracks(),
           videoStream,
           canvasStream,
           window.watchparty.videoRefs
@@ -189,30 +191,30 @@ export class VideoChat extends React.Component<VideoChatProps> {
       });
   };
 
-  getFace = async (stream2, options) => {
-    const result = await faceapi
-      .detectSingleFace(stream2, options)
-      .withFaceLandmarks()
-      .withFaceDescriptor();
+  // getFace = async (stream2, options) => {
+  //   const result = await faceapi
+  //     .detectSingleFace(stream2, options)
+  //     .withFaceLandmarks()
+  //     .withFaceDescriptor();
 
-    if (result) {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(stream2, 0, 0);
+  //   if (result) {
+  //     const canvas = document.createElement('canvas');
+  //     const ctx = canvas.getContext('2d');
+  //     ctx.drawImage(stream2, 0, 0);
 
-      const { image } = faceapi.createCanvasFromMedia(canvas);
-      const { faceDetection } = result;
-      ctx.drawImage(
-        image,
-        faceDetection.box.x + 15,
-        faceDetection.box.y + 30,
-        faceDetection.box.width,
-        faceDetection.box.width * (image.height / image.width)
-      );
+  //     const { image } = faceapi.createCanvasFromMedia(canvas);
+  //     const { faceDetection } = result;
+  //     ctx.drawImage(
+  //       image,
+  //       faceDetection.box.x + 15,
+  //       faceDetection.box.y + 30,
+  //       faceDetection.box.width,
+  //       faceDetection.box.width * (image.height / image.width)
+  //     );
 
-      requestAnimationFrame(step);
-    }
-  };
+  //     requestAnimationFrame(step);
+  //   }
+  // };
 
   componentDidMount() {
     console.log(window);
@@ -390,17 +392,17 @@ export class VideoChat extends React.Component<VideoChatProps> {
       if (id === selfId) {
         console.log('cheking streams--->', 2);
         videoPCs[id] = new RTCPeerConnection();
+        ourStream?.getTracks().forEach((track) => {
+          videoPCs[id].addTrack(track, ourStream);
+        });
         videoRefs[id].srcObject = ourStream;
       } else {
         console.log('cheking streams--->', 6);
         const pc = new RTCPeerConnection({ iceServers: iceServers() });
         videoPCs[id] = pc;
-        // Add our own video as outgoing stream
+        // Add our own video and canvas tracks as outgoing streams
         ourStream?.getTracks().forEach((track) => {
-          if (ourStream) {
-            console.log('cheking streams--->3', track);
-            pc.addTrack(track, ourStream);
-          }
+          pc.addTrack(track, ourStream);
         });
         pc.onicecandidate = (event) => {
           // We generated an ICE candidate, send it to peer
@@ -570,7 +572,7 @@ export class VideoChat extends React.Component<VideoChatProps> {
             ></canvas>
           </div> */}
           {participants.map((p) => {
-            console.log('participants==>', p.isVideoChat);
+            console.log('participants==>', p);
             return (
               <div key={p.id}>
                 <div
@@ -605,34 +607,57 @@ export class VideoChat extends React.Component<VideoChatProps> {
                       }
                     />
                     {this.ar ? (
-                      <div className="myapp">
-                        {console.log('here-in-ar-part')}
+                      p.clientId === selfId ? (
+                        <div className="myapp">
+                          {console.log('here-in-ar-part')}
+                          <video
+                            style={{
+                              ...videoChatContentStyle,
+                              // mirror the video if it's our stream. this style mimics Zoom where your
+                              // video is mirrored only for you)
+                            }}
+                            crossOrigin="anonymous"
+                            ref={this.videoRef}
+                            autoPlay
+                          ></video>
+                          <canvas
+                            ref={this.canvasRef}
+                            width="940"
+                            height="650"
+                            className="appcanvas"
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 40,
+                            }}
+                          ></canvas>
+                        </div>
+                      ) : (
                         <video
+                          ref={(el) => {
+                            if (el) {
+                              videoRefs[p.clientId] = el;
+                              // this.getFace(videoRefs[p.clientId], this.options);
+                            }
+                          }}
                           style={{
                             ...videoChatContentStyle,
                             // mirror the video if it's our stream. this style mimics Zoom where your
                             // video is mirrored only for you)
+                            transform: `scaleX(${
+                              p.clientId === selfId ? '-1' : '1'
+                            })`,
                           }}
-                          crossOrigin="anonymous"
-                          ref={this.videoRef}
                           autoPlay
-                        ></video>
-                        <canvas
-                          ref={this.canvasRef}
-                          width="940"
-                          height="650"
-                          className="appcanvas"
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                          }}
-                        ></canvas>
-                      </div>
+                          muted={p.clientId === selfId}
+                          data-id={p.id}
+                        />
+                      )
                     ) : ourStream && p.isVideoChat ? (
                       <video
                         ref={(el) => {
                           if (el) {
+                            console.log('---rendering_video', el, videoRefs);
                             videoRefs[p.clientId] = el;
                             // this.getFace(videoRefs[p.clientId], this.options);
                           }
