@@ -8,7 +8,7 @@
 .hero {
   color: white;
   width: 100%;
-  background-image: linear-gradient(to bottom, #222222, #006199);
+  background-image: linear-gradient(to bottom, #222222, #f4a046);
   border-bottom-left-radius: 0%;
   border-bottom-right-radius: 50%;
   display: flex;
@@ -16,7 +16,7 @@
 }
 
 .hero.green {
-  background-image: linear-gradient(to bottom, #222222, rgb(21, 114, 43));
+  background-image: linear-gradient(to bottom, #222222, #fff);
   border-bottom-left-radius: 50%;
   border-bottom-right-radius: 0%;
 }

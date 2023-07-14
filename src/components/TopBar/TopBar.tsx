@@ -68,7 +68,7 @@ export class NewRoomButton extends React.Component<{
             fluid
           >
             <Icon name="certificate" />
-            New Room
+            Watch:Party
           </Button>
         }
       />
@@ -321,7 +321,7 @@ export class TopBar extends React.Component<{
                     style={{
                       textTransform: 'uppercase',
                       fontWeight: 700,
-                      color: '#2185d0',
+                      color: '#fff',
                       fontSize: '30px',
                       lineHeight: '30px',
                     }}
@@ -332,7 +332,7 @@ export class TopBar extends React.Component<{
                     style={{
                       textTransform: 'uppercase',
                       fontWeight: 700,
-                      color: '#21ba45',
+                      color: '#f4a046',
                       fontSize: '30px',
                       lineHeight: '30px',
                       marginLeft: 'auto',

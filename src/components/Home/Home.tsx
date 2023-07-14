@@ -10,7 +10,9 @@ export const Home = ({ user }: { user: firebase.User | undefined }) => {
     <div>
       <div className={styles.container}>
         <Hero
-          heroText={'AR based Watch-PARTY App'}
+          heroText={
+            'Immersive Watch Party Experience: FANISKO Unleashes AR Interaction'
+          }
           subText={'No registration or download required.'}
           action={
             <div style={{ marginTop: '8px', width: '300px' }}>
@@ -22,29 +24,29 @@ export const Home = ({ user }: { user: firebase.User | undefined }) => {
         <Divider horizontal>
           <Header inverted as="h4">
             <Icon name="cogs" />
-            Features
+            Features of Fanisko Watch-Party
           </Header>
         </Divider>
         <div className={styles.featureSection}>
           <Feature
             icon="sync"
-            title="Synchronized Play"
-            text="Starts, stops, and seeks are synchronized to everyone, so take those restroom and snack breaks without worrying about falling behind."
+            title="Immersive Sync:"
+            text="Stay United in Perfect Harmony"
           />
           <Feature
             icon="conversation"
-            title="Chat"
-            text="Chat with others in your room. Memes and inside jokes encouraged."
+            title="Dynamic Chats"
+            text="Engage, Laugh, Connect Instantly"
           />
           <Feature
             icon="list"
-            title="Playlists"
-            text="Set up a whole list of videos to play next, and rearrange to your heart's content."
+            title="Tailored Playlists"
+            text="Curate Your Ultimate Watch Experience"
           />
           <Feature
             icon="video"
-            title="Video chat"
-            text="Jump into video chat if you'd rather be face-to-face."
+            title="AR Video Chat"
+            text="Connect Face-to-Face in Augumented Reality"
           />
         </div>
         <Hero
@@ -59,7 +61,7 @@ export const Home = ({ user }: { user: firebase.User | undefined }) => {
             Watch anything together
           </Header>
         </Divider>
-        <div className={styles.featureSection}>
+        {/* <div className={styles.featureSection}>
           <Feature
             icon="desktop"
             title={`AR-Interaction`}
@@ -85,14 +87,14 @@ export const Home = ({ user }: { user: firebase.User | undefined }) => {
             title={`URL`}
             text="Paste in a video URL for everyone to watch from."
           />
-        </div>
-        <Hero
+        </div> */}
+        {/* <Hero
           heroText={'Theater mode.'}
           subText={
             'Bring video and chat front-and-center for minimal distractions.'
           }
           image={'/fanisko.png'}
-        />
+        /> */}
         <Divider horizontal />
         <div
           style={{
