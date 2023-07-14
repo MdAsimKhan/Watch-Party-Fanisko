@@ -2,6 +2,8 @@
 
 ![XROS](./readme-images/xros.png)
 
+![Watchparty](./readme-images/watchparty.gif)
+
 ## Table of Contents
 
 1. [Introduction](#1-introduction)
@@ -313,7 +315,7 @@ One of the main issues faced in the Fanisko Watchparty AR project was the derefe
 
 To resolve this issue, the project utilized face-api.js, which is an ML face detection model based on TensorFlow.js. The project detects faces using face-api.js and applies the AR filters by drawing them on the HTML canvas element.
 
-![emoji](./readme-images/fanisko-r10.png)
+![Watchparty](./readme-images/issue.gif)
 
 ### Proposed Solutions and Future Improvements
 
